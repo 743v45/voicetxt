@@ -39,7 +39,7 @@ function App() {
   const [model, setModel] = useState<ModelId>('base')
   const [allStatus, setAllStatus] = useState<Record<string, ModelStatus>>({})
   const [lang, setLang] = useState<Language>('zh')
-  const [wordTs, setWordTs] = useState(false)
+  const [wordTs, setWordTs] = useState(true)
   const [diar, setDiar] = useState(false)
   const [caps, setCaps] = useState<Capabilities | null>(null)
   const [mgrOpen, setMgrOpen] = useState(false)
