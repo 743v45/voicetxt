@@ -10,7 +10,7 @@
     "build:core": "pnpm --filter @voicetxt/core build",
     "build:web": "pnpm --filter @voicetxt/web build",
     "preview": "pnpm --filter @voicetxt/web preview",
-    "test": "pnpm -r --run test",
+    "test": "pnpm --filter @voicetxt/core test",
     "test:e2e": "pnpm --filter @voicetxt/e2e test",
     "lint": "pnpm -r --run lint",
     "typecheck": "pnpm -r --run typecheck"

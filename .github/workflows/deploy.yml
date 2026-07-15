@@ -1,6 +1,7 @@
 name: Deploy
-# 同时部署到 GitHub Pages 与 Cloudflare Pages（双平台）。
-# 模型文件不进产物，走 Hugging Face CDN；产物仅前端代码。
+# 部署到 GitHub Pages。
+# Cloudflare Pages 由控制台直连本 Git 仓库自动构建（免维护 token），故此 workflow 只管 GH Pages。
+# 模型文件不进产物，走 Hugging Face CDN。
 on:
   push:
     branches: [main, master]
@@ -21,8 +22,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -51,20 +50,3 @@ jobs:
           path: dist
       - id: deployment
         uses: actions/deploy-pages@v4
-
-  # Cloudflare Pages：也可改为在 Cloudflare 控制台直连 Git 自动构建（免维护 token）。
-  cloudflare-pages:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: dist
-          path: packages/web/dist
-      - uses: cloudflare/pages-action@v1
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: voicetxt
-          directory: packages/web/dist
