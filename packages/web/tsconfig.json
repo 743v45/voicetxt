@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@voicetxt/core": ["../core/src"],
+      "@voicetxt/core/*": ["../core/src/*"]
+    },
+    "types": ["vite/client"]
+  },
+  "include": ["src"]
+}

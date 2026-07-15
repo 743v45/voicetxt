@@ -1,0 +1,36 @@
+{
+  "name": "@voicetxt/core",
+  "version": "0.1.0",
+  "description": "voicetxt STT 核心：transformers.js + Whisper，零 UI 依赖，可被 web 与浏览器扩展复用",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --max-warnings 0"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^3.0.4"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.0",
+    "@types/node": "^22.7.0"
+  }
+}

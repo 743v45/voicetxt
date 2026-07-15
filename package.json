@@ -1,0 +1,28 @@
+{
+  "name": "voicetxt",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "纯前端语音转文字 + 字幕生成工具（本地 Whisper，无后端）",
+  "scripts": {
+    "dev": "pnpm --filter @voicetxt/web dev",
+    "build": "pnpm --filter @voicetxt/core build && pnpm --filter @voicetxt/web build",
+    "build:core": "pnpm --filter @voicetxt/core build",
+    "build:web": "pnpm --filter @voicetxt/web build",
+    "preview": "pnpm --filter @voicetxt/web preview",
+    "test": "pnpm -r --run test",
+    "test:e2e": "pnpm --filter @voicetxt/e2e test",
+    "lint": "pnpm -r --run lint",
+    "typecheck": "pnpm -r --run typecheck"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3"
+  },
+  "packageManager": "pnpm@10.28.1",
+  "engines": {
+    "node": ">=20"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
+  }
+}

@@ -1,0 +1,27 @@
+node_modules
+dist
+build
+.DS_Store
+*.local
+
+# 构建产物 / 缓存
+.vite
+.turbo
+.tsbuildinfo
+
+# 测试
+coverage
+test-results
+playwright-report
+blob-report
+playwright/.cache
+
+# 环境
+.env
+.env.*
+!.env.example
+
+# 编辑器
+.vscode/*
+!.vscode/extensions.json
+.idea
