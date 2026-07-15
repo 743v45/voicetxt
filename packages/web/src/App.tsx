@@ -86,7 +86,7 @@ function App() {
           </div>
           <div className="flex items-center gap-3 text-sm">
             <span className="text-muted-foreground">
-              {caps?.webgpu ? 'WebGPU 加速' : caps ? 'CPU (WASM)' : '检测中…'}
+              {caps?.webgpu ? '支持 WebGPU · 默认 CPU 更稳' : caps ? 'CPU (WASM)' : '检测中…'}
             </span>
             <Button variant="outline" size="sm" onClick={() => setMgrOpen(true)}>
               <Settings2 className="mr-1 h-4 w-4" /> 模型管理

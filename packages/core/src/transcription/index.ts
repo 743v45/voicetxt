@@ -17,7 +17,10 @@ env.allowLocalModels = false // 走 Hugging Face CDN
 
 function pickDevice(opts: EngineOptions): 'webgpu' | 'wasm' {
   if (opts.device) return opts.device
-  return typeof navigator !== 'undefined' && 'gpu' in navigator ? 'webgpu' : 'wasm'
+  // 默认 WASM（CPU）：transformers.js 的 Whisper 在 WebGPU 后端对部分模型/GPU
+  // 会输出乱码，且无 GPU 适配器时直接报 "no available backend found"。
+  // WASM 质量稳定可靠（慢于 WebGPU，但不乱码）。
+  return 'wasm'
 }
 
 /** 把 word 级时间戳聚合成句子级 segments（按停顿分组），供 SRT/VTT 使用。 */
