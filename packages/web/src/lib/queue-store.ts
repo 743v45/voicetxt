@@ -18,6 +18,8 @@ export interface QueueTask {
   progress: number
   result: TranscribeResult | null
   error: string | null
+  /** 完整错误（原始消息 + 堆栈），UI 默认折叠 */
+  errorDetail?: string | null
   /** 任务添加时间（ms 时间戳） */
   addedAt: number
   /** 开始执行时间 */

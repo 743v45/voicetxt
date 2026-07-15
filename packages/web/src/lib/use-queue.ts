@@ -105,6 +105,7 @@ export function useQueue() {
         patchTask(m.id, {
           status: 'error',
           error: m.message,
+          errorDetail: m.errorDetail ?? null,
           finishedAt: Date.now(),
         })
         void persistTask(m.id)

@@ -190,7 +190,16 @@ export function QueuePanel({ queue }: { queue: QueueApi }) {
                   ) : (
                     <span>音频已清理</span>
                   )}
-                  {task.error && <span className="text-destructive">错误：{task.error}</span>}
+                  {task.error && (
+                    <details className="text-destructive">
+                      <summary className="cursor-pointer">错误：{task.error}</summary>
+                      {task.errorDetail && (
+                        <pre className="mt-1 whitespace-pre-wrap rounded bg-muted p-2 text-xs text-muted-foreground">
+                          {task.errorDetail}
+                        </pre>
+                      )}
+                    </details>
+                  )}
                 </div>
 
                 <div className="mt-2 flex flex-wrap gap-2">
