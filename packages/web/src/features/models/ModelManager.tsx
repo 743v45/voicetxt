@@ -115,7 +115,7 @@ export function ModelManager({ open, onOpenChange, selected, onSelect, onModelsC
                   'group flex items-center gap-3 rounded-lg border p-3',
                   st === 'cached' &&
                     'border-emerald-300 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-950/30',
-                  st === 'remote' && 'border-dashed opacity-70',
+                  st === 'remote' && 'border-dashed',
                   st === 'downloading' &&
                     'border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30',
                   isCurrent && 'border-primary',
@@ -177,14 +177,15 @@ export function ModelManager({ open, onOpenChange, selected, onSelect, onModelsC
                       )}
                       {m.engine === 'sherpa' ? '开发中' : st === 'cached' ? '重下' : '下载'}
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      disabled={st !== 'cached'}
-                      onClick={() => handleRemove(m.id)}
-                    >
-                      <Trash2 className="mr-1 h-4 w-4" /> 删除
-                    </Button>
+                    {st === 'cached' && (
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => handleRemove(m.id)}
+                      >
+                        <Trash2 className="mr-1 h-4 w-4" /> 删除
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
