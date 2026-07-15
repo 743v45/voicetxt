@@ -289,7 +289,36 @@ Whisper 非流式，做不到无限连续输出。准实时方案：
 
 ---
 
-## 16. 后续阶段（不在本次范围）
+## 16. 处理队列
+
+多任务排队处理：默认串行、可配并发 1-3，支持暂停、持久化、进度，每任务独立模型。
+
+### 数据模型（QueueTask，IndexedDB `voicetxt-tasks`）
+`id / name / blob(可清理) / model / opts / status(pending|running|done|error) / progress / result / error / addedAt / startedAt / finishedAt / durationMs`
+
+### 调度（`lib/use-queue.ts`）
+- concurrency 个常驻 Worker（默认 1，设置 1–3），从 `pending` 按序取任务；实际并发不超设置。
+- **暂停**：`paused` 时不取新任务，当前 `running` 跑完；暂停按钮仅 `hasActive`（有 pending/running）时可用。
+- 解码 + 重采样在**主线程**（Web Audio 仅主线程可用），PCM 传 Worker 推理。
+- 进度更新只走 state；状态变更（添加/完成/失败/清理/重试）才写 IndexedDB（避免大 blob 频繁回写）。
+- 重启时 `running` 回退 `pending`，续跑。
+
+### UI（`features/queue/QueuePanel.tsx`）
+工具栏（计数 Badge + concurrency 设置 + 暂停/恢复 + 清空）+ 任务列表（模型/状态/进度条/各时间戳 + 查看结果/重试/清理音频/删除）。结果从任务点开 Dialog 查看（复用 ResultPanel）。
+
+### 每任务独立模型
+添加任务时用左侧"任务设置"（模型/语言/逐词/说话人），任务记住当时的设置。
+
+### 验收补充
+- 添加任务入队、按序处理、完成出字幕；并发 1-3 可配且不超限
+- 暂停：不启动新任务、当前跑完；恢复后继续
+- 刷新/重启：任务与字幕保留，running 回退 pending
+- 清理音频：blob 置空、字幕保留；进度条识别中实时更新
+- medium(1.5GB) 在管理/引导/选择器三处体积警告
+
+---
+
+## 17. 后续阶段（不在本次范围）
 
 - 浏览器扩展（MV3）：popup + offdocument + 与 core 接线
 - B 站视频数据获取（分片 dash 抓取/合并/解码），作为扩展的数据源
