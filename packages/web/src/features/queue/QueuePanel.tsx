@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { ModelBadge } from '@/components/ModelBadge'
 import { Progress } from '@/components/ui/progress'
 import {
   Select,
@@ -166,7 +167,7 @@ export function QueuePanel({ queue }: { queue: QueueApi }) {
               <div key={task.id} className="rounded-lg border p-3">
                 <div className="flex items-center gap-2">
                   <span className="flex-1 truncate font-medium">{task.name}</span>
-                  <Badge variant="secondary">{model.id}</Badge>
+                  <ModelBadge id={model.id} />
                   <Badge variant={STATUS_VARIANT[task.status]}>
                     {STATUS_LABEL[task.status]}
                   </Badge>

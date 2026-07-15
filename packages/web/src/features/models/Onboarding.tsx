@@ -9,6 +9,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
+import { ModelBadge } from '@/components/ModelBadge'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { MODEL_REGISTRY, downloadModel } from '@voicetxt/core'
@@ -66,7 +67,7 @@ export function Onboarding({ open, onOpenChange, onReady }: Props) {
               )}
             >
               <span className="flex-1">
-                <span className="font-medium">{m.id}</span>{' '}
+                <ModelBadge id={m.id} />{' '}
                 <span className="text-xs text-muted-foreground">{m.description}</span>
               </span>
               <Badge variant="secondary">{m.sizeLabel}</Badge>

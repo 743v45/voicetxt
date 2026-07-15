@@ -8,6 +8,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
+import { ModelBadge } from '@/components/ModelBadge'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import {
@@ -102,7 +103,7 @@ export function ModelManager({ open, onOpenChange, selected, onSelect }: Props) 
               >
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium">{m.id}</span>
+                    <ModelBadge id={m.id} />
                     <Badge variant="secondary">{m.sizeLabel}</Badge>
                     {isCurrent && <Badge>当前</Badge>}
                   </div>
