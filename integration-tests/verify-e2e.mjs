@@ -4,10 +4,8 @@ import { chromium } from '@playwright/test'
 import path from 'node:path'
 
 const URL = process.env.URL || 'http://localhost:4173'
-const AUDIO = path.resolve(
-  process.env.HOME ?? '/Users/taevas',
-  'Desktop/我要一瓶beer.mp3',
-)
+// 默认用仓库内 fixture(jfk.wav)；也可传任意音频: node verify-e2e.mjs <audio-path>
+const AUDIO = path.resolve(process.argv[2] || 'integration-tests/fixtures/jfk.wav')
 const PROFILE = '/tmp/voicetxt-pw-profile'
 
 const browser = await chromium.launchPersistentContext(PROFILE, {
@@ -82,7 +80,9 @@ try {
     const text = (await page.locator('pre').first().innerText()).trim()
     log('=== RESULT ===')
     console.log(text)
-    const looksOk = /我要|一瓶|beer/i.test(text)
+    // 通用判断：非空且无明显乱码（单字符连发 / 同词重复 3 次以上）
+    const looksGarbage = /(.)\1{6,}|(\b\w+\b)\s+\2\s+\2/i.test(text)
+    const looksOk = text.length > 5 && !looksGarbage
     log(`looksReasonable=${looksOk}`)
     await browser.close()
     process.exit(looksOk ? 0 : 1)

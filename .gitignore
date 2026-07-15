@@ -15,6 +15,7 @@ test-results
 playwright-report
 blob-report
 playwright/.cache
+integration-tests/verify-fail.png
 
 # 环境
 .env
