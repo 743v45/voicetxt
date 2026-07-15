@@ -92,8 +92,19 @@ export function ModelManager({ open, onOpenChange, selected, onSelect, onModelsC
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-2">
-          {MODEL_REGISTRY.map((m) => {
+        <div className="space-y-4">
+          {(
+            [
+              { title: 'Whisper（transformers.js）', items: MODEL_REGISTRY.filter((m) => m.engine !== 'sherpa') },
+              { title: 'Sherpa（sherpa-onnx，开发中）', items: MODEL_REGISTRY.filter((m) => m.engine === 'sherpa') },
+            ] as { title: string; items: typeof MODEL_REGISTRY }[]
+          )
+            .map((g) => ({ ...g, items: [...g.items].sort((a, b) => a.size - b.size) }))
+            .filter((g) => g.items.length > 0)
+            .map((group) => (
+              <div key={group.title} className="space-y-2">
+                <h4 className="text-xs font-medium text-muted-foreground">{group.title}</h4>
+                {group.items.map((m) => {
             const st = statuses[m.id] ?? 'remote'
             const pct = dl[m.id] ? Math.round(dl[m.id] * 100) : 0
             const isCurrent = selected === m.id
@@ -179,6 +190,8 @@ export function ModelManager({ open, onOpenChange, selected, onSelect, onModelsC
               </div>
             )
           })}
+            </div>
+          ))}
         </div>
 
         <div className="flex items-center justify-between border-t pt-3 text-sm text-muted-foreground">

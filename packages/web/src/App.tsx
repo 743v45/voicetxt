@@ -12,7 +12,6 @@ import {
 } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Toaster } from '@/components/ui/sonner'
-import { MemoryIndicator } from '@/components/MemoryIndicator'
 import { MODEL_DTYPE } from '@/components/ModelBadge'
 import { InputPanel } from '@/features/input/InputPanel'
 import { QueuePanel } from '@/features/queue/QueuePanel'
@@ -115,7 +114,6 @@ function App() {
             <span className="text-muted-foreground">
               {caps?.webgpu ? '支持 WebGPU · 默认 CPU 更稳' : caps ? 'CPU (WASM)' : '检测中…'}
             </span>
-            <MemoryIndicator />
             <Button variant="outline" size="sm" onClick={() => setMgrOpen(true)}>
               <Settings2 className="mr-1 h-4 w-4" /> 模型管理
             </Button>
