@@ -25,12 +25,17 @@ self.onmessage = async (e: MessageEvent) => {
     post({ type: 'result', id, result })
     engine.dispose()
   } catch (err) {
-    // 完整错误打到 Console 便于排查（message 可能只是无意义数字/码）
     console.error('[transcribe.worker] error:', err)
+    let message = err instanceof Error ? err.message : String(err)
+    // 识别 onnxruntime 内存分配失败，给友好提示
+    if (/allocate|create a session|out of memory|heap/i.test(message)) {
+      message =
+        '内存不足（浏览器 WASM 限制）：大模型(small/medium)或多并发易超内存。请换 base/tiny，或把并发设为 1 后重试。'
+    }
     post({
       type: 'error',
       id,
-      message: err instanceof Error ? err.message : String(err),
+      message,
     })
   }
 }
