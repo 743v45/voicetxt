@@ -5,9 +5,9 @@
 // 主线程 → { type:'transcribe', id, input:Float32Array(16k mono), opts }
 // Worker  → { type:'progress'|'result'|'error', id, ... }
 
-// CDN base（GitHub release asset，支持 CORS 直 fetch）
+// CDN base（HF model repo，ACAO:* 可跨域 fetch）
 const CDN =
-  'https://github.com/743v45/voicetxt-sherpa-assets/releases/download/v1.13.4-paraformer-zh-en/'
+  'https://huggingface.co/743v45/voicetxt-sherpa-paraformer/resolve/main/'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let recognizer: any = null
@@ -38,9 +38,9 @@ function loadSherpa(): Promise<void> {
       },
     }
     try {
-      // classic worker：importScripts 加载 Emscripten main + glue
-      importScripts(CDN + 'sherpa-onnx-wasm-main-asr.js')
-      importScripts(CDN + 'sherpa-onnx-asr.js')
+      // JS 自托管（同源，避 importScripts 跨域）；wasm/data 走 CDN(locateFile fetch, CORS 放行)
+      importScripts('/sherpa/sherpa-onnx-wasm-main-asr.js')
+      importScripts('/sherpa/sherpa-onnx-asr.js')
     } catch (e) {
       clearTimeout(timer)
       ready = null

@@ -75,9 +75,10 @@ function App() {
     })()
   }, [])
 
-  // 当前模型若未下载，回退到首个已下载的
+  // whisper 模型若未下载，回退到首个已下载的；sherpa 走 CDN 无需下载，不回退
   useEffect(() => {
-    if (allStatus[model] !== 'cached') {
+    const info = MODEL_REGISTRY.find((m) => m.id === model)
+    if (allStatus[model] !== 'cached' && info?.engine !== 'sherpa') {
       const firstCached = MODEL_REGISTRY.find((m) => allStatus[m.id] === 'cached')
       if (firstCached) setModel(firstCached.id)
     }
