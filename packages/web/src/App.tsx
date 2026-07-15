@@ -13,6 +13,7 @@ import {
 import { Label } from '@/components/ui/label'
 import { Toaster } from '@/components/ui/sonner'
 import { MemoryIndicator } from '@/components/MemoryIndicator'
+import { MODEL_DTYPE } from '@/components/ModelBadge'
 import { InputPanel } from '@/features/input/InputPanel'
 import { QueuePanel } from '@/features/queue/QueuePanel'
 import { ModelManager } from '@/features/models/ModelManager'
@@ -144,7 +145,7 @@ function App() {
                     <SelectContent>
                       {cachedModels.map((m) => (
                         <SelectItem key={m.id} value={m.id}>
-                          {m.id} · {m.sizeLabel}
+                          {m.id} · {m.sizeLabel} · {MODEL_DTYPE[m.id]}
                         </SelectItem>
                       ))}
                     </SelectContent>

@@ -8,7 +8,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
-import { ModelBadge } from '@/components/ModelBadge'
+import { ModelBadge, MODEL_DTYPE } from '@/components/ModelBadge'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import {
@@ -114,6 +114,7 @@ export function ModelManager({ open, onOpenChange, selected, onSelect, onModelsC
                   <div className="flex items-center gap-2">
                     <ModelBadge id={m.id} />
                     <Badge variant="secondary">{m.sizeLabel}</Badge>
+                    <Badge variant="outline">{MODEL_DTYPE[m.id]}</Badge>
                     {isCurrent && <Badge>当前</Badge>}
                   </div>
                   <p className="text-xs text-muted-foreground">{m.description}</p>
