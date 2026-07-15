@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Loader2, Settings2 } from 'lucide-react'
+import { Settings2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -11,11 +12,12 @@ import {
 } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { Toaster } from '@/components/ui/sonner'
 import { InputPanel } from '@/features/input/InputPanel'
-import { ResultPanel } from '@/features/result/ResultPanel'
+import { QueuePanel } from '@/features/queue/QueuePanel'
 import { ModelManager } from '@/features/models/ModelManager'
 import { Onboarding } from '@/features/models/Onboarding'
-import { useTranscribe } from '@/lib/use-transcribe'
+import { useQueue } from '@/lib/use-queue'
 import {
   MODEL_REGISTRY,
   getModelInfo,
@@ -48,49 +50,41 @@ function App() {
   const [mgrOpen, setMgrOpen] = useState(false)
   const [onboardOpen, setOnboardOpen] = useState(false)
   const [modelReady, setModelReady] = useState(false)
-  const [audioUrl, setAudioUrl] = useState<string | undefined>(undefined)
-  const t = useTranscribe()
+  const queue = useQueue()
   const currentModel = getModelInfo(model)
 
   useEffect(() => {
     void detectCapabilities().then(setCaps)
   }, [])
 
-  const checkReady = async (id: ModelId) => {
+  const checkReady = async (id: ModelId) =>
     setModelReady((await getModelStatus(id)) === 'cached')
-  }
 
   useEffect(() => {
     void checkReady(model)
   }, [model])
 
   useEffect(() => {
-    // 首次：若没有任何已下载模型，弹引导
     void (async () => {
-      const statuses = await Promise.all(MODEL_REGISTRY.map((m) => getModelStatus(m.id)))
-      if (!statuses.includes('cached')) setOnboardOpen(true)
+      const s = await Promise.all(MODEL_REGISTRY.map((m) => getModelStatus(m.id)))
+      if (!s.includes('cached')) setOnboardOpen(true)
     })()
   }, [])
 
-  const handleBlob = async (blob: Blob) => {
+  // 输入 → 加入队列（用当前任务设置；每个任务记住当时的模型/选项）
+  const handleAdd = async (blob: Blob, name: string) => {
     if ((await getModelStatus(model)) !== 'cached') {
+      toast.error(`模型 ${model} 未下载，已打开模型管理`)
       setMgrOpen(true)
       return
     }
-    if (audioUrl) URL.revokeObjectURL(audioUrl)
-    setAudioUrl(URL.createObjectURL(blob))
-    try {
-      await t.transcribe(model, blob, {
-        language: lang,
-        wordTimestamps: wordTs,
-        diarization: diar,
-      })
-    } catch {
-      /* 错误已在 hook 的 error 中暴露 */
-    }
+    await queue.addTask(blob, name, model, {
+      language: lang,
+      wordTimestamps: wordTs,
+      diarization: diar,
+    })
+    toast.success(`已加入队列：${name}`)
   }
-
-  const pct = t.progress ? Math.round((t.progress.ratio ?? 0) * 100) : 0
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -110,99 +104,94 @@ function App() {
         </div>
       </header>
 
-      <main className="container grid gap-4 py-6 md:grid-cols-2">
+      <main className="container grid gap-4 py-6 lg:grid-cols-[380px_1fr]">
         <Card>
           <CardHeader>
-            <CardTitle>输入</CardTitle>
+            <CardTitle>输入与任务设置</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <InputPanel onBlob={handleBlob} disabled={t.busy} />
+            <InputPanel onBlob={handleAdd} />
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs">模型</Label>
-                <Select value={model} onValueChange={(v) => setModel(v as ModelId)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {MODEL_REGISTRY.map((m) => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.id} · {m.sizeLabel}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {modelReady ? (
-                    <Badge>已就绪</Badge>
-                  ) : (
-                    <Badge variant="outline">未下载</Badge>
-                  )}
-                  {currentModel.size >= 1e9 && (
-                    <span className="text-xs font-medium text-amber-600 dark:text-amber-500">
-                      ⚠️ 体积较大，移动端不建议
-                    </span>
-                  )}
+            <div className="space-y-3 border-t pt-3">
+              <p className="text-xs text-muted-foreground">
+                以下设置应用于新加入队列的任务
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">模型</Label>
+                  <Select value={model} onValueChange={(v) => setModel(v as ModelId)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MODEL_REGISTRY.map((m) => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.id} · {m.sizeLabel}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {modelReady ? (
+                      <Badge>已就绪</Badge>
+                    ) : (
+                      <Badge variant="outline">未下载</Badge>
+                    )}
+                    {currentModel.size >= 1e9 && (
+                      <span className="text-xs font-medium text-amber-600 dark:text-amber-500">
+                        ⚠️ 体积大
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <p className="text-xs text-muted-foreground">{currentModel.description}</p>
+
+                <div className="space-y-1">
+                  <Label className="text-xs">语言</Label>
+                  <Select value={lang} onValueChange={(v) => setLang(v as Language)}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {LANGS.map((l) => (
+                        <SelectItem key={l.value} value={l.value}>
+                          {l.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
-              <div className="space-y-1">
-                <Label className="text-xs">语言</Label>
-                <Select value={lang} onValueChange={(v) => setLang(v as Language)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {LANGS.map((l) => (
-                      <SelectItem key={l.value} value={l.value}>
-                        {l.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="flex flex-wrap items-center gap-4">
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4"
+                    checked={wordTs}
+                    onChange={(e) => setWordTs(e.target.checked)}
+                  />
+                  逐词时间戳
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4"
+                    checked={diar}
+                    onChange={(e) => setDiar(e.target.checked)}
+                  />
+                  说话人区分（实验性）
+                </label>
               </div>
             </div>
-
-            <div className="flex flex-wrap items-center gap-4">
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4"
-                  checked={wordTs}
-                  onChange={(e) => setWordTs(e.target.checked)}
-                />
-                逐词时间戳
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4"
-                  checked={diar}
-                  onChange={(e) => setDiar(e.target.checked)}
-                />
-                说话人区分（实验性）
-              </label>
-            </div>
-
-            {t.busy && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {t.progress?.message ? `${t.progress.message} ` : '识别中…'}
-                {pct > 0 && `${pct}%`}
-              </div>
-            )}
-            {t.error && <p className="text-sm text-destructive">错误：{t.error}</p>}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>结果</CardTitle>
+            <CardTitle>处理队列</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResultPanel result={t.result} audioUrl={audioUrl} />
+            <QueuePanel queue={queue} />
           </CardContent>
         </Card>
       </main>
@@ -224,6 +213,7 @@ function App() {
           void checkReady(id)
         }}
       />
+      <Toaster richColors position="bottom-right" />
     </div>
   )
 }
