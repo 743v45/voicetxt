@@ -105,6 +105,9 @@ function App() {
         <div className="container flex h-14 items-center justify-between">
           <div className="flex items-center gap-2 font-semibold">
             <span className="text-primary">●</span> voicetxt
+            <span className="text-xs font-normal text-muted-foreground">
+              v{__APP_VERSION__} · {__GIT_HASH__}
+            </span>
           </div>
           <div className="flex items-center gap-3 text-sm">
             <span className="text-muted-foreground">
