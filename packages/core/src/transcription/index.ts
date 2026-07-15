@@ -78,6 +78,10 @@ export async function createTranscriptionEngine(opts: EngineOptions): Promise<En
       return_timestamps: wantWords ? 'word' : true,
       chunk_length_s: 30,
       stride_length_s: 5,
+      // 抑制 Whisper 幻觉：禁止用上一窗口的文本作为下一窗口的提示，
+      // 否则一旦某段产生幻觉/重复，会"种子化"后续窗口，级联出
+      // 同 token 重复（如 "col deadareaingu col deadareaingu..."）与多语言乱词。
+      condition_on_previous_text: false,
       callback: () => {
         if (aborted) throw new DOMException('Aborted', 'AbortError')
       },
