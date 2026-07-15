@@ -45,10 +45,12 @@ export async function createTranscriptionEngine(opts: EngineOptions): Promise<En
   const info = getModelInfo(opts.model)
   const device = pickDevice(opts)
 
+  // 大模型用 q4 量化（约一半内存，让 small/medium 更可能在 WASM 跑通）；小模型 q8 保质量
+  const dtype = opts.model === 'small' || opts.model === 'medium' ? 'q4' : 'q8'
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const transcriber: any = await pipeline('automatic-speech-recognition', info.hfId, {
     device,
-    dtype: 'q8',
+    dtype,
   })
 
   let aborted = false
