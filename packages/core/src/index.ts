@@ -31,13 +31,18 @@ export { detectCapabilities } from './capabilities'
 export { runWorkerBridge } from './transcription/worker-bridge'
 
 import type { Engine, EngineOptions } from './types'
-import { getModelStatus } from './models'
+import { getModelStatus, getModelInfo } from './models'
 
 /**
  * 创建识别引擎。零 UI 依赖，可在主线程、Worker、或扩展 offscreen document 调用。
  * 实现细节在 transcription 模块；此处为编排入口。
  */
 export async function createEngine(opts: EngineOptions): Promise<Engine> {
+  // 按模型引擎路由：sherpa 走 sherpa-onnx-wasm，其余走 whisper(transformers.js)
+  if (getModelInfo(opts.model).engine === 'sherpa') {
+    const { createSherpaEngine } = await import('./sherpa')
+    return createSherpaEngine(opts)
+  }
   const status = await getModelStatus(opts.model)
   if (status !== 'cached') {
     throw new Error(

@@ -154,7 +154,9 @@ export function ModelManager({ open, onOpenChange, selected, onSelect, onModelsC
                     )}
                     <Button
                       size="sm"
-                      disabled={st === 'downloading' || busyId === m.id}
+                      disabled={
+                        st === 'downloading' || busyId === m.id || m.engine === 'sherpa'
+                      }
                       onClick={() => handleDownload(m.id)}
                     >
                       {busyId === m.id ? (
@@ -162,7 +164,7 @@ export function ModelManager({ open, onOpenChange, selected, onSelect, onModelsC
                       ) : (
                         <Download className="mr-1 h-4 w-4" />
                       )}
-                      {st === 'cached' ? '重下' : '下载'}
+                      {m.engine === 'sherpa' ? '开发中' : st === 'cached' ? '重下' : '下载'}
                     </Button>
                     <Button
                       size="sm"

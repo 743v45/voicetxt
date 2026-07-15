@@ -44,6 +44,24 @@ export const MODEL_REGISTRY: ModelInfo[] = [
     multilingual: true,
     description: 'large-v3-turbo，多语言，比 medium 更准更快（q4 省内存）',
   },
+  {
+    id: 'sensevoice',
+    hfId: 'sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17',
+    size: 550_000_000,
+    sizeLabel: '550 MB',
+    multilingual: true,
+    description: 'SenseVoice（阿里），中/英/日/韩/粤，中文很强（sherpa 引擎）',
+    engine: 'sherpa',
+  },
+  {
+    id: 'paraformer',
+    hfId: 'sherpa-onnx-paraformer-zh-2023-09-14',
+    size: 220_000_000,
+    sizeLabel: '220 MB',
+    multilingual: false,
+    description: 'Paraformer（阿里），中文普通话，非自回归快（sherpa 引擎）',
+    engine: 'sherpa',
+  },
 ]
 
 const DB_NAME = 'voicetxt-models'
