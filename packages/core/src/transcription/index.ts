@@ -45,8 +45,8 @@ export async function createTranscriptionEngine(opts: EngineOptions): Promise<En
   const info = getModelInfo(opts.model)
   const device = pickDevice(opts)
 
-  // 量化策略：仅 medium 用 q4（约一半内存，更可能在 WASM 跑通）；其余 q8（质量优先）
-  const dtype = opts.model === 'medium' ? 'q4' : 'q8'
+  // 量化策略：medium/turbo 用 q4（约一半内存，更可能在 WASM 跑通）；其余 q8（质量优先）
+  const dtype = opts.model === 'medium' || opts.model === 'turbo' ? 'q4' : 'q8'
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const transcriber: any = await pipeline('automatic-speech-recognition', info.hfId, {
     device,

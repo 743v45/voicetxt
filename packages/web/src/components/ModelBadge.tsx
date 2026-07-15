@@ -2,12 +2,13 @@ import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import type { ModelId } from '@voicetxt/core'
 
-/** 各档量化（与 core/transcription 的 dtypeFor 一致：仅 medium 用 q4 省内存，其余 q8） */
+/** 各档量化（与 core/transcription 的 dtypeFor 一致：medium/turbo 用 q4，其余 q8） */
 export const MODEL_DTYPE: Record<ModelId, string> = {
   tiny: 'q8',
   base: 'q8',
   small: 'q8',
   medium: 'q4',
+  turbo: 'q4',
 }
 
 // 按强度递进的高级配色（冷 → 暖）：
@@ -18,6 +19,7 @@ const STYLES: Record<ModelId, string> = {
   small: 'bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300',
   medium:
     'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300',
+  turbo: 'bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300',
 }
 
 export function ModelBadge({ id, className }: { id: ModelId; className?: string }) {

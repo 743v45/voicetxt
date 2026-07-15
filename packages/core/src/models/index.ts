@@ -36,6 +36,14 @@ export const MODEL_REGISTRY: ModelInfo[] = [
     multilingual: true,
     description: '最高质量，算力要求高（移动端慎用）',
   },
+  {
+    id: 'turbo',
+    hfId: 'onnx-community/whisper-large-v3-turbo',
+    size: 838_860_800,
+    sizeLabel: '800 MB',
+    multilingual: true,
+    description: 'large-v3-turbo，多语言，比 medium 更准更快（q4 省内存）',
+  },
 ]
 
 const DB_NAME = 'voicetxt-models'

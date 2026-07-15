@@ -1,7 +1,7 @@
 // voicetxt core 公共类型契约。所有子模块与消费者（web / 扩展）共用。
 
 /** Whisper 模型档位 */
-export type ModelId = 'tiny' | 'base' | 'small' | 'medium'
+export type ModelId = 'tiny' | 'base' | 'small' | 'medium' | 'turbo'
 
 /** 推理后端 */
 export type Device = 'webgpu' | 'wasm'
