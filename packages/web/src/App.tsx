@@ -11,7 +11,6 @@ import {
   SelectItem,
 } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import { Toaster } from '@/components/ui/sonner'
 import { InputPanel } from '@/features/input/InputPanel'
 import { QueuePanel } from '@/features/queue/QueuePanel'
@@ -49,20 +48,12 @@ function App() {
   const [caps, setCaps] = useState<Capabilities | null>(null)
   const [mgrOpen, setMgrOpen] = useState(false)
   const [onboardOpen, setOnboardOpen] = useState(false)
-  const [modelReady, setModelReady] = useState(false)
   const queue = useQueue()
   const currentModel = getModelInfo(model)
 
   useEffect(() => {
     void detectCapabilities().then(setCaps)
   }, [])
-
-  const checkReady = async (id: ModelId) =>
-    setModelReady((await getModelStatus(id)) === 'cached')
-
-  useEffect(() => {
-    void checkReady(model)
-  }, [model])
 
   useEffect(() => {
     void (async () => {
@@ -131,18 +122,11 @@ function App() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {modelReady ? (
-                      <Badge>已就绪</Badge>
-                    ) : (
-                      <Badge variant="outline">未下载</Badge>
-                    )}
-                    {currentModel.size >= 1e9 && (
-                      <span className="text-xs font-medium text-amber-600 dark:text-amber-500">
-                        ⚠️ 体积大
-                      </span>
-                    )}
-                  </div>
+                  {currentModel.size >= 1e9 && (
+                    <p className="text-xs font-medium text-amber-600 dark:text-amber-500">
+                      ⚠️ 体积较大，移动端不建议
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-1">
@@ -205,14 +189,7 @@ function App() {
           setMgrOpen(false)
         }}
       />
-      <Onboarding
-        open={onboardOpen}
-        onOpenChange={setOnboardOpen}
-        onReady={(id) => {
-          setModel(id)
-          void checkReady(id)
-        }}
-      />
+      <Onboarding open={onboardOpen} onOpenChange={setOnboardOpen} onReady={(id) => setModel(id)} />
       <Toaster richColors position="bottom-right" />
     </div>
   )
