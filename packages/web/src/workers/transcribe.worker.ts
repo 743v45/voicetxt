@@ -25,6 +25,8 @@ self.onmessage = async (e: MessageEvent) => {
     post({ type: 'result', id, result })
     engine.dispose()
   } catch (err) {
+    // 完整错误打到 Console 便于排查（message 可能只是无意义数字/码）
+    console.error('[transcribe.worker] error:', err)
     post({
       type: 'error',
       id,

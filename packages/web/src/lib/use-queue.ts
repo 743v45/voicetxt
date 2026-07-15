@@ -150,6 +150,7 @@ export function useQueue() {
           [samples.buffer],
         )
       } catch (e) {
+        console.error('[queue] decode/launch error:', e)
         patchTask(task.id, {
           status: 'error',
           error: e instanceof Error ? e.message : String(e),
