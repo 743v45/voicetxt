@@ -36,7 +36,9 @@ const LANGS: { value: Language; label: string }[] = [
 ]
 
 function App() {
-  const [model, setModel] = useState<ModelId>('base')
+  const [model, setModel] = useState<ModelId>(
+    () => (localStorage.getItem('voicetxt-model') as ModelId | null) ?? 'base',
+  )
   const [allStatus, setAllStatus] = useState<Record<string, ModelStatus>>({})
   const [lang, setLang] = useState<Language>('zh')
   const [wordTs, setWordTs] = useState(true)
@@ -59,6 +61,11 @@ function App() {
   useEffect(() => {
     void detectCapabilities().then(setCaps)
   }, [])
+
+  // 记住选用的模型，刷新后恢复
+  useEffect(() => {
+    localStorage.setItem('voicetxt-model', model)
+  }, [model])
 
   useEffect(() => {
     void (async () => {
