@@ -85,7 +85,9 @@ function App() {
 
   // 输入 → 加入队列（仅允许已下载模型；下拉已限制，此处双保险）
   const handleAdd = async (blob: Blob, name: string) => {
-    if (allStatus[model] !== 'cached') {
+    const info = MODEL_REGISTRY.find((m) => m.id === model)
+    // whisper 需已下载；sherpa 走 CDN 无需下载
+    if (allStatus[model] !== 'cached' && info?.engine !== 'sherpa') {
       toast.error('请先在模型管理下载模型')
       setMgrOpen(true)
       return
@@ -98,7 +100,9 @@ function App() {
     toast.success(`已加入队列：${name}`)
   }
 
-  const cachedModels = MODEL_REGISTRY.filter((m) => allStatus[m.id] === 'cached')
+  const cachedModels = MODEL_REGISTRY.filter(
+    (m) => m.engine === 'sherpa' || allStatus[m.id] === 'cached',
+  )
 
   return (
     <div className="min-h-screen bg-background text-foreground">

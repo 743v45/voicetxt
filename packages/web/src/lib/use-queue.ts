@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { decodeAudio, resampleTo16kMono } from '@voicetxt/core'
+import { decodeAudio, resampleTo16kMono, getModelInfo } from '@voicetxt/core'
 import type { ModelId, TranscribeOptions } from '@voicetxt/core'
 import {
   loadTasks,
@@ -35,8 +35,10 @@ export function useQueue() {
 
   // 同步引用，供调度/worker 回调读取最新值，避免闭包陈旧
   const tasksRef = useRef<QueueTask[]>([])
-  const workersRef = useRef<Worker[]>([])
-  const workerTaskRef = useRef<Map<Worker, string>>(new Map()) // worker → 正在处理的 task id
+  const workersRef = useRef<Worker[]>([]) // whisper module worker 池
+  const workerTaskRef = useRef<Map<Worker, string>>(new Map()) // whisper worker → task id
+  const sherpaWorkerRef = useRef<Worker | null>(null) // sherpa classic worker（单）
+  const sherpaBusyRef = useRef(false)
   const pausedRef = useRef(false)
   const concurrencyRef = useRef(concurrency)
 
@@ -78,7 +80,7 @@ export function useQueue() {
     })()
   }, [])
 
-  // —— Worker 创建（统一消息路由 by task id）——
+  // —— Whisper Worker 创建（module worker，统一消息路由 by task id）——
   const createWorker = useCallback((): Worker => {
     const w = new Worker(
       new URL('../workers/transcribe.worker.ts', import.meta.url),
@@ -115,7 +117,43 @@ export function useQueue() {
     return w
   }, [patchTask, persistTask])
 
-  // —— Worker 池随 concurrency 调整（增补；减时只回收 idle 的）——
+  // —— Sherpa Worker 创建（classic worker，importScripts 加载 wasm）——
+  const createSherpaWorker = useCallback((): Worker => {
+    const w = new Worker(new URL('../workers/sherpa.worker.ts', import.meta.url), {
+      type: 'classic',
+    })
+    w.onmessage = (e: MessageEvent) => {
+      const m = e.data
+      if (m.type === 'progress') {
+        patchTask(m.id, { progress: m.progress?.ratio ?? 0 })
+      } else if (m.type === 'result') {
+        const task = tasksRef.current.find((t) => t.id === m.id)
+        const now = Date.now()
+        const duration = task?.startedAt ? now - task.startedAt : null
+        patchTask(m.id, {
+          status: 'done',
+          progress: 1,
+          result: m.result,
+          finishedAt: now,
+          durationMs: duration,
+        })
+        void persistTask(m.id)
+        sherpaBusyRef.current = false
+      } else if (m.type === 'error') {
+        patchTask(m.id, {
+          status: 'error',
+          error: m.message,
+          errorDetail: m.errorDetail ?? null,
+          finishedAt: Date.now(),
+        })
+        void persistTask(m.id)
+        sherpaBusyRef.current = false
+      }
+    }
+    return w
+  }, [patchTask, persistTask])
+
+  // —— Whisper Worker 池随 concurrency 调整（增补；减时只回收 idle 的）——
   useEffect(() => {
     const pool = workersRef.current
     while (pool.length < concurrencyRef.current) pool.push(createWorker())
@@ -133,7 +171,7 @@ export function useQueue() {
     }
   }, [concurrency, createWorker])
 
-  // —— 执行单个任务（主线程解码 + 重采样 → 传 Worker 推理）——
+  // —— Whisper 任务执行（主线程解码 + 重采样 → 传 module worker 推理）——
   const runTask = useCallback(
     async (task: QueueTask, worker: Worker) => {
       workerTaskRef.current.set(worker, task.id)
@@ -164,17 +202,63 @@ export function useQueue() {
     [patchTask, persistTask],
   )
 
-  // —— 调度：tasks/paused/concurrency 变化时尝试启动下一个 ——
+  // —— Sherpa 任务执行（单 classic worker，串行）——
+  const runSherpaTask = useCallback(
+    async (task: QueueTask) => {
+      if (!sherpaWorkerRef.current) {
+        sherpaWorkerRef.current = createSherpaWorker()
+      }
+      const worker = sherpaWorkerRef.current
+      sherpaBusyRef.current = true
+      patchTask(task.id, {
+        status: 'running',
+        startedAt: Date.now(),
+        progress: 0,
+        error: null,
+      })
+      try {
+        if (!task.blob) throw new Error('音频已清理，无法识别')
+        const samples = await resampleTo16kMono(await decodeAudio(task.blob))
+        worker.postMessage(
+          { type: 'transcribe', id: task.id, input: samples, opts: task.opts },
+          [samples.buffer],
+        )
+      } catch (e) {
+        console.error('[queue] sherpa decode/launch error:', e)
+        patchTask(task.id, {
+          status: 'error',
+          error: e instanceof Error ? e.message : String(e),
+          finishedAt: Date.now(),
+        })
+        void persistTask(task.id)
+        sherpaBusyRef.current = false
+      }
+    },
+    [createSherpaWorker, patchTask, persistTask],
+  )
+
+  // —— 调度：sherpa 任务（单 worker 串行）+ whisper 任务（池）——
   useEffect(() => {
     if (paused) return
+    const isSherpa = (t: QueueTask) => getModelInfo(t.model).engine === 'sherpa'
+    // sherpa：idle 时取一个 sherpa pending
+    if (!sherpaBusyRef.current) {
+      const sherpaNext = tasksRef.current.find((t) => t.status === 'pending' && isSherpa(t))
+      if (sherpaNext) {
+        void runSherpaTask(sherpaNext)
+        return
+      }
+    }
+    // whisper：池内取 idle worker + 一个非 sherpa pending
     if (workerTaskRef.current.size >= concurrencyRef.current) return
     const idle = workersRef.current.find((w) => !workerTaskRef.current.has(w))
     if (!idle) return
-    const next = tasksRef.current.find((t) => t.status === 'pending')
-    if (!next) return
-    void runTask(next, idle)
-    // runTask 会 patchTask → tasks 变化 → 本 effect 再次触发，继续调度
-  }, [tasks, paused, concurrency, runTask])
+    const whisperNext = tasksRef.current.find(
+      (t) => t.status === 'pending' && !isSherpa(t),
+    )
+    if (!whisperNext) return
+    void runTask(whisperNext, idle)
+  }, [tasks, paused, concurrency, runTask, runSherpaTask])
 
   // —— 对外 API ——
   const addTask = useCallback(
@@ -256,6 +340,8 @@ export function useQueue() {
     () => () => {
       workersRef.current.forEach((w) => w.terminate())
       workersRef.current = []
+      sherpaWorkerRef.current?.terminate()
+      sherpaWorkerRef.current = null
     },
     [],
   )
