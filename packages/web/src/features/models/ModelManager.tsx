@@ -33,10 +33,12 @@ interface Props {
   onOpenChange: (v: boolean) => void
   selected: ModelId
   onSelect: (id: ModelId) => void
+  /** 模型下载/删除等变化时通知外部刷新（保持与主界面同步） */
+  onModelsChanged?: () => void
 }
 
 /** 模型管理：列出档位、状态徽章、下载/删除/选用、缓存占用与清理。 */
-export function ModelManager({ open, onOpenChange, selected, onSelect }: Props) {
+export function ModelManager({ open, onOpenChange, selected, onSelect, onModelsChanged }: Props) {
   const [statuses, setStatuses] = useState<Record<string, ModelStatus>>({})
   const [dl, setDl] = useState<Record<string, number>>({})
   const [cache, setCache] = useState(0)
@@ -48,6 +50,8 @@ export function ModelManager({ open, onOpenChange, selected, onSelect }: Props) 
     )
     setStatuses(Object.fromEntries(entries))
     setCache(await getCacheSize())
+    // 通知外部（App）同步模型可用状态
+    void onModelsChanged?.()
   }
 
   useEffect(() => {

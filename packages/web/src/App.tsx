@@ -217,7 +217,9 @@ function App() {
         onSelect={(id) => {
           setModel(id)
           setMgrOpen(false)
+          void refreshAllStatus()
         }}
+        onModelsChanged={() => void refreshAllStatus()}
       />
       <Onboarding
         open={onboardOpen}
