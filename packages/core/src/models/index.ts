@@ -138,17 +138,23 @@ export async function downloadModel(
   try {
     const { pipeline, env } = await import('@huggingface/transformers')
     env.allowLocalModels = false
+    // 按文件聚合进度，避免多文件各自 0-100% 导致进度条乱跳
+    const fileProgress: Record<string, number> = {}
+    let prevRatio = 0
     await pipeline('automatic-speech-recognition', info.hfId, {
       dtype: 'q8',
       progress_callback: (e: { status?: string; progress?: number; file?: string }) => {
         if (!opts?.onProgress) return
-        const ratio =
-          typeof e.progress === 'number' && e.progress >= 0 && e.progress <= 100
-            ? e.progress / 100
-            : 0
+        // 各文件取已达到的最大值，总体取均值，且单调递增不回退
+        if (typeof e.progress === 'number' && e.file) {
+          fileProgress[e.file] = Math.max(fileProgress[e.file] ?? 0, e.progress)
+        }
+        const vals = Object.values(fileProgress)
+        const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length / 100 : 0
+        prevRatio = Math.max(prevRatio, avg)
         opts.onProgress({
           phase: 'download',
-          ratio,
+          ratio: prevRatio,
           message: e.file ? `${e.status ?? ''} ${e.file}` : (e.status ?? ''),
         })
       },
