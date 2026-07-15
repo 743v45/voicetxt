@@ -160,7 +160,7 @@ export function QueuePanel({ queue }: { queue: QueueApi }) {
         </div>
       ) : (
         <div className="space-y-2">
-          {queue.tasks.map((task) => {
+          {[...queue.tasks].reverse().map((task) => {
             const model = getModelInfo(task.model)
             return (
               <div key={task.id} className="rounded-lg border p-3">
