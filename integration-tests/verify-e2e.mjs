@@ -9,7 +9,7 @@ const AUDIO = path.resolve(process.argv[2] || 'integration-tests/fixtures/jfk.wa
 const PROFILE = '/tmp/voicetxt-pw-profile'
 
 const browser = await chromium.launchPersistentContext(PROFILE, {
-  headless: true,
+  headless: !process.env.HEADED, // HEADED=1 走有头浏览器
   viewport: { width: 1280, height: 900 },
 })
 const page = await browser.newPage()
@@ -84,6 +84,10 @@ try {
     const looksGarbage = /(.)\1{6,}|(\b\w+\b)\s+\2\s+\2/i.test(text)
     const looksOk = text.length > 5 && !looksGarbage
     log(`looksReasonable=${looksOk}`)
+    if (process.env.KEEP) {
+      log('浏览器保持打开（KEEP 模式）。可在窗口内继续操作；关闭窗口或由我停止脚本。')
+      await new Promise((resolve) => browser.on('close', resolve))
+    }
     await browser.close()
     process.exit(looksOk ? 0 : 1)
   } else {

@@ -42,7 +42,7 @@ const LANGS: { value: Language; label: string }[] = [
 
 function App() {
   const [model, setModel] = useState<ModelId>('base')
-  const [lang, setLang] = useState<Language>('auto')
+  const [lang, setLang] = useState<Language>('zh')
   const [wordTs, setWordTs] = useState(false)
   const [diar, setDiar] = useState(false)
   const [caps, setCaps] = useState<Capabilities | null>(null)
@@ -143,6 +143,11 @@ function App() {
                       ))}
                     </SelectContent>
                   </Select>
+                  {lang === 'auto' && (
+                    <p className="text-xs text-amber-600 dark:text-amber-500">
+                      ⚠️ 自动检测对中英混合 / 含英文词的音频可能误判（如判成英文漏掉中文段），建议指定语言
+                    </p>
+                  )}
                 </div>
               </div>
 
