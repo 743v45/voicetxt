@@ -11,7 +11,7 @@ self.onmessage = async (e: MessageEvent) => {
   const { id, model, input, opts } = data as {
     id: number
     model: ModelId
-    input: Blob
+    input: Float32Array // 主线程已解码并重采样到 16kHz 单声道
     opts?: TranscribeOptions
   }
 

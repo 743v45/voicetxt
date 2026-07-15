@@ -70,6 +70,7 @@ export function Onboarding({ open, onOpenChange, onReady }: Props) {
                 <span className="text-xs text-muted-foreground">{m.description}</span>
               </span>
               <Badge variant="secondary">{m.sizeLabel}</Badge>
+              {m.size >= 1e9 && <Badge variant="destructive">⚠️ 体积大</Badge>}
             </button>
           ))}
         </div>

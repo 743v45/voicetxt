@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { decodeAudio, resampleTo16kMono } from '@voicetxt/core'
 import type {
   ModelId,
   Progress,
@@ -56,11 +57,18 @@ export function useTranscribe() {
       setError(null)
       setProgress(null)
       setResult(null)
+      // Web Audio（AudioContext）仅在主线程可用，Worker 内没有。
+      // 故在主线程完成解码 + 重采样到 16kHz 单声道，再把 PCM 交给 Worker 做识别。
+      const samples = await resampleTo16kMono(await decodeAudio(input))
       const w = ensureWorker()
       const id = ++idRef.current
       return new Promise<TranscribeResult>((resolve, reject) => {
         pendingRef.current = { resolve, reject }
-        w.postMessage({ type: 'transcribe', id, model, input, opts })
+        // 转移 ArrayBuffer 所有权，避免大数组拷贝
+        w.postMessage(
+          { type: 'transcribe', id, model, input: samples, opts },
+          [samples.buffer],
+        )
       })
     },
     [ensureWorker],

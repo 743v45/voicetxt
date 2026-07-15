@@ -91,53 +91,59 @@ export function ModelManager({ open, onOpenChange, selected, onSelect }: Props) 
           {MODEL_REGISTRY.map((m) => {
             const st = statuses[m.id] ?? 'remote'
             const pct = dl[m.id] ? Math.round(dl[m.id] * 100) : 0
+            const isCurrent = selected === m.id
             return (
               <div
                 key={m.id}
                 className={cn(
-                  'flex items-center gap-3 rounded-lg border p-3',
-                  selected === m.id && 'border-primary',
+                  'group flex items-center gap-3 rounded-lg border p-3',
+                  isCurrent && 'border-primary',
                 )}
               >
                 <div className="flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-2">
                     <span className="font-medium">{m.id}</span>
                     <Badge variant="secondary">{m.sizeLabel}</Badge>
-                    {st === 'cached' && <Badge>已下载</Badge>}
-                    {st === 'downloading' && (
-                      <Badge variant="outline">下载中 {pct}%</Badge>
-                    )}
-                    {st === 'remote' && <Badge variant="outline">未下载</Badge>}
-                    {selected === m.id && <Badge>当前</Badge>}
+                    {isCurrent && <Badge>当前</Badge>}
                   </div>
                   <p className="text-xs text-muted-foreground">{m.description}</p>
+                  {m.size >= 1e9 && (
+                    <p className="mt-1 text-xs font-medium text-amber-600 dark:text-amber-500">
+                      ⚠️ 体积较大（{m.sizeLabel}），下载与推理耗时/耗流量高，移动端不建议
+                    </p>
+                  )}
                   {st === 'downloading' && <Progress value={pct} className="mt-2" />}
                 </div>
 
-                <div className="flex gap-2">
-                  {st === 'cached' ? (
-                    <>
-                      {selected !== m.id && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => onSelect(m.id)}
-                        >
-                          <Check className="mr-1 h-4 w-4" /> 选用
-                        </Button>
-                      )}
+                <div className="flex items-center justify-end gap-2">
+                  {/* 默认显示状态按钮；悬停行时切换为操作按钮 */}
+                  <div className="flex items-center gap-2 group-hover:hidden">
+                    {st === 'cached' && (
+                      <Button variant="outline" size="sm">已下载</Button>
+                    )}
+                    {st === 'downloading' && (
+                      <Button variant="outline" size="sm" disabled>
+                        下载中 {pct}%
+                      </Button>
+                    )}
+                    {st === 'remote' && (
+                      <Button variant="outline" size="sm">未下载</Button>
+                    )}
+                  </div>
+
+                  <div className="hidden items-center gap-1 group-hover:flex">
+                    {!isCurrent && st === 'cached' && (
                       <Button
                         size="sm"
-                        variant="ghost"
-                        onClick={() => handleRemove(m.id)}
+                        variant="outline"
+                        onClick={() => onSelect(m.id)}
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Check className="mr-1 h-4 w-4" /> 选用
                       </Button>
-                    </>
-                  ) : (
+                    )}
                     <Button
                       size="sm"
-                      disabled={busyId === m.id}
+                      disabled={st === 'downloading' || busyId === m.id}
                       onClick={() => handleDownload(m.id)}
                     >
                       {busyId === m.id ? (
@@ -145,9 +151,17 @@ export function ModelManager({ open, onOpenChange, selected, onSelect }: Props) 
                       ) : (
                         <Download className="mr-1 h-4 w-4" />
                       )}
-                      下载
+                      {st === 'cached' ? '重下' : '下载'}
                     </Button>
-                  )}
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      disabled={st !== 'cached'}
+                      onClick={() => handleRemove(m.id)}
+                    >
+                      <Trash2 className="mr-1 h-4 w-4" /> 删除
+                    </Button>
+                  </div>
                 </div>
               </div>
             )

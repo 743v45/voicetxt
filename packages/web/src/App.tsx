@@ -10,6 +10,7 @@ import {
   SelectItem,
 } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
 import { InputPanel } from '@/features/input/InputPanel'
 import { ResultPanel } from '@/features/result/ResultPanel'
 import { ModelManager } from '@/features/models/ModelManager'
@@ -17,6 +18,7 @@ import { Onboarding } from '@/features/models/Onboarding'
 import { useTranscribe } from '@/lib/use-transcribe'
 import {
   MODEL_REGISTRY,
+  getModelInfo,
   getModelStatus,
   detectCapabilities,
 } from '@voicetxt/core'
@@ -48,6 +50,7 @@ function App() {
   const [modelReady, setModelReady] = useState(false)
   const [audioUrl, setAudioUrl] = useState<string | undefined>(undefined)
   const t = useTranscribe()
+  const currentModel = getModelInfo(model)
 
   useEffect(() => {
     void detectCapabilities().then(setCaps)
@@ -130,11 +133,19 @@ function App() {
                     ))}
                   </SelectContent>
                 </Select>
-                {!modelReady && (
-                  <p className="text-xs text-amber-600 dark:text-amber-500">
-                    该模型未下载，将打开模型管理
-                  </p>
-                )}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {modelReady ? (
+                    <Badge>已就绪</Badge>
+                  ) : (
+                    <Badge variant="outline">未下载</Badge>
+                  )}
+                  {currentModel.size >= 1e9 && (
+                    <span className="text-xs font-medium text-amber-600 dark:text-amber-500">
+                      ⚠️ 体积较大，移动端不建议
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">{currentModel.description}</p>
               </div>
 
               <div className="space-y-1">
