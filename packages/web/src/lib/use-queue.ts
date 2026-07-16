@@ -12,6 +12,13 @@ import {
 const CONCURRENCY_KEY = 'voicetxt-concurrency'
 const MAX_CONCURRENCY = 3
 
+// 闲置自动回收：worker 完成任务后空闲超过此时长则 terminate（唯一能回收 wasm heap 的手段）
+const IDLE_TIMEOUT_MS = 60_000
+// dev 测试钩子：?idleTimeout=N（秒）下调自动回收超时便于测试；仅 DEV 生效
+const idleTimeoutMs = import.meta.env.DEV
+  ? Math.max(1, Number(new URLSearchParams(location.search).get('idleTimeout')) || IDLE_TIMEOUT_MS)
+  : IDLE_TIMEOUT_MS
+
 function loadConcurrency(): number {
   const v = Number(localStorage.getItem(CONCURRENCY_KEY))
   return v >= 1 && v <= MAX_CONCURRENCY ? v : 1
@@ -28,6 +35,14 @@ export interface QueueCounts {
   error: number
 }
 
+/** worker 池可见状态（浏览器无标准 API 测 worker wasm heap，故只暴露存活数） */
+export interface PoolStats {
+  total: number
+  busy: number
+  idle: number
+  sherpa: boolean
+}
+
 export function useQueue() {
   const [tasks, setTasks] = useState<QueueTask[]>([])
   const [concurrency, setConcurrencyState] = useState<number>(loadConcurrency)
@@ -41,6 +56,9 @@ export function useQueue() {
   const sherpaBusyRef = useRef(false)
   const pausedRef = useRef(false)
   const concurrencyRef = useRef(concurrency)
+
+  const [pool, setPool] = useState<PoolStats>({ total: 0, busy: 0, idle: 0, sherpa: false })
+  const idleTimersRef = useRef<Map<Worker, ReturnType<typeof setTimeout>>>(new Map())
 
   useEffect(() => {
     tasksRef.current = tasks
@@ -80,6 +98,50 @@ export function useQueue() {
     })()
   }, [])
 
+  // —— worker 池内存回收：闲置计时器 + 状态重算 ——
+  // recomputePool：把池存活/忙闲数同步到 UI state（在所有池结构变化点调用）
+  const recomputePool = useCallback(() => {
+    setPool((prev) => {
+      const total = workersRef.current.length
+      const busy = workerTaskRef.current.size
+      const next = { total, busy, idle: total - busy, sherpa: sherpaWorkerRef.current != null }
+      return prev.total === next.total &&
+        prev.busy === next.busy &&
+        prev.idle === next.idle &&
+        prev.sherpa === next.sherpa
+        ? prev
+        : next
+    })
+  }, [])
+
+  // clearIdleTimer：取消某 worker 的闲置计时（变 busy 或被移除时）
+  const clearIdleTimer = useCallback((w: Worker) => {
+    const t = idleTimersRef.current.get(w)
+    if (t !== undefined) {
+      clearTimeout(t)
+      idleTimersRef.current.delete(w)
+    }
+  }, [])
+
+  // armIdleTimer：worker 变 idle 时启动闲置计时，到期 terminate 该 worker（真正回收 wasm heap）
+  const armIdleTimer = useCallback(
+    (w: Worker) => {
+      clearIdleTimer(w)
+      const id = setTimeout(() => {
+        // 防御二次校验：clear 可能调晚（回调已入队），此时 worker 可能已被分配为 busy
+        if (workersRef.current.includes(w) && !workerTaskRef.current.has(w)) {
+          w.terminate()
+          workersRef.current = workersRef.current.filter((x) => x !== w)
+          recomputePool()
+        }
+        // 无论是否 terminate 都清掉自己，防 map 泄漏
+        idleTimersRef.current.delete(w)
+      }, idleTimeoutMs)
+      idleTimersRef.current.set(w, id)
+    },
+    [clearIdleTimer, recomputePool],
+  )
+
   // —— Whisper Worker 创建（module worker，统一消息路由 by task id）——
   const createWorker = useCallback((): Worker => {
     const w = new Worker(
@@ -103,6 +165,8 @@ export function useQueue() {
         })
         void persistTask(m.id)
         workerTaskRef.current.delete(w)
+        armIdleTimer(w)
+        recomputePool()
       } else if (m.type === 'error') {
         patchTask(m.id, {
           status: 'error',
@@ -112,10 +176,12 @@ export function useQueue() {
         })
         void persistTask(m.id)
         workerTaskRef.current.delete(w)
+        armIdleTimer(w)
+        recomputePool()
       }
     }
     return w
-  }, [patchTask, persistTask])
+  }, [patchTask, persistTask, armIdleTimer, recomputePool])
 
   // —— Sherpa Worker 创建（classic worker，importScripts 加载 wasm）——
   const createSherpaWorker = useCallback((): Worker => {
@@ -155,26 +221,30 @@ export function useQueue() {
 
   // —— Whisper Worker 池随 concurrency 调整（增补；减时只回收 idle 的）——
   useEffect(() => {
-    const pool = workersRef.current
-    while (pool.length < concurrencyRef.current) pool.push(createWorker())
-    const excess = pool.length - concurrencyRef.current
+    const ws = workersRef.current
+    while (ws.length < concurrencyRef.current) ws.push(createWorker())
+    const excess = ws.length - concurrencyRef.current
     if (excess > 0) {
       let removed = 0
-      for (let i = pool.length - 1; i >= 0 && removed < excess; i--) {
-        const w = pool[i]
+      for (let i = ws.length - 1; i >= 0 && removed < excess; i--) {
+        const w = ws[i]
         if (!workerTaskRef.current.has(w)) {
+          clearIdleTimer(w)
           w.terminate()
-          pool.splice(i, 1)
+          ws.splice(i, 1)
           removed++
         }
       }
     }
-  }, [concurrency, createWorker])
+    recomputePool()
+  }, [concurrency, createWorker, clearIdleTimer, recomputePool])
 
   // —— Whisper 任务执行（主线程解码 + 重采样 → 传 module worker 推理）——
   const runTask = useCallback(
     async (task: QueueTask, worker: Worker) => {
       workerTaskRef.current.set(worker, task.id)
+      clearIdleTimer(worker)
+      recomputePool()
       patchTask(task.id, {
         status: 'running',
         startedAt: Date.now(),
@@ -197,9 +267,11 @@ export function useQueue() {
         })
         void persistTask(task.id)
         workerTaskRef.current.delete(worker)
+        armIdleTimer(worker)
+        recomputePool()
       }
     },
-    [patchTask, persistTask],
+    [patchTask, persistTask, clearIdleTimer, armIdleTimer, recomputePool],
   )
 
   // —— Sherpa 任务执行（单 classic worker，串行）——
@@ -237,9 +309,8 @@ export function useQueue() {
     [createSherpaWorker, patchTask, persistTask],
   )
 
-  // —— 调度：sherpa 任务（单 worker 串行）+ whisper 任务（池）——
-  useEffect(() => {
-    if (paused) return
+  // —— 调度：sherpa 任务（单 worker 串行）+ whisper 任务（弹性补池 + 每轮分配一个）——
+  const schedule = useCallback(() => {
     const isSherpa = (t: QueueTask) => getModelInfo(t.model).engine === 'sherpa'
     // sherpa：idle 时取一个 sherpa pending
     if (!sherpaBusyRef.current) {
@@ -249,7 +320,16 @@ export function useQueue() {
         return
       }
     }
-    // whisper：池内取 idle worker + 一个非 sherpa pending
+    // whisper 弹性补池：按 min(并发, 待处理数) 建够 worker（只建 worker，可循环）
+    const whisperPending = tasksRef.current.filter(
+      (t) => t.status === 'pending' && !isSherpa(t),
+    ).length
+    const target = Math.min(concurrencyRef.current, whisperPending)
+    while (workersRef.current.length < target) {
+      workersRef.current.push(createWorker())
+    }
+    recomputePool()
+    // 分配：池内取 idle worker + 一个 whisper pending（每轮一个，禁止循环，防同任务双发）
     if (workerTaskRef.current.size >= concurrencyRef.current) return
     const idle = workersRef.current.find((w) => !workerTaskRef.current.has(w))
     if (!idle) return
@@ -258,7 +338,35 @@ export function useQueue() {
     )
     if (!whisperNext) return
     void runTask(whisperNext, idle)
-  }, [tasks, paused, concurrency, runTask, runSherpaTask])
+  }, [createWorker, runSherpaTask, runTask, recomputePool])
+
+  useEffect(() => {
+    if (paused) return
+    schedule()
+  }, [tasks, paused, concurrency, schedule])
+
+  // —— 手动释放内存：terminate 所有 idle whisper worker + 非忙 sherpa（busy 保留）——
+  const releaseMemory = useCallback(() => {
+    let released = 0
+    for (let i = workersRef.current.length - 1; i >= 0; i--) {
+      const w = workersRef.current[i]
+      if (!workerTaskRef.current.has(w)) {
+        clearIdleTimer(w)
+        w.terminate()
+        workersRef.current.splice(i, 1)
+        released++
+      }
+    }
+    if (sherpaWorkerRef.current && !sherpaBusyRef.current) {
+      sherpaWorkerRef.current.terminate()
+      sherpaWorkerRef.current = null
+      released++
+    }
+    recomputePool()
+    // 未暂停时才补池重分配，避免在 paused 下启动任务
+    if (!pausedRef.current) schedule()
+    return released
+  }, [clearIdleTimer, recomputePool, schedule])
 
   // —— 对外 API ——
   const addTask = useCallback(
@@ -335,9 +443,11 @@ export function useQueue() {
 
   const togglePause = useCallback(() => setPaused((p) => !p), [])
 
-  // 卸载时清理 worker
+  // 卸载时清理 worker 与闲置计时器
   useEffect(
     () => () => {
+      idleTimersRef.current.forEach((t) => clearTimeout(t))
+      idleTimersRef.current.clear()
       workersRef.current.forEach((w) => w.terminate())
       workersRef.current = []
       sherpaWorkerRef.current?.terminate()
@@ -361,6 +471,7 @@ export function useQueue() {
     paused,
     counts,
     hasActive,
+    pool,
     addTask,
     retryTask,
     removeTask,
@@ -368,5 +479,6 @@ export function useQueue() {
     clearAll,
     setConcurrency,
     togglePause,
+    releaseMemory,
   }
 }

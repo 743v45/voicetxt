@@ -7,6 +7,7 @@ import {
   RefreshCw,
   Trash2,
   Volume2,
+  Zap,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -26,10 +27,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
+import { toast } from 'sonner'
 import { ResultPanel } from '@/features/result/ResultPanel'
 import { getModelInfo } from '@voicetxt/core'
 import type { QueueTask, TaskStatus } from '@/lib/queue-store'
-import type { QueueCounts } from '@/lib/use-queue'
+import type { QueueCounts, PoolStats } from '@/lib/use-queue'
 
 /** useQueue 返回的、本组件需要的子集 */
 export interface QueueApi {
@@ -38,12 +40,14 @@ export interface QueueApi {
   paused: boolean
   counts: QueueCounts
   hasActive: boolean
+  pool: PoolStats
   setConcurrency: (n: number) => void
   togglePause: () => void
   retryTask: (id: string) => void | Promise<void>
   removeTask: (id: string) => void | Promise<void>
   clearAudio: (id: string) => void | Promise<void>
   clearAll: () => void | Promise<void>
+  releaseMemory: () => number
 }
 
 function formatTime(ms: number): string {
@@ -101,6 +105,13 @@ export function QueuePanel({ queue }: { queue: QueueApi }) {
           <Badge>识别中 {queue.counts.running}</Badge>
           <Badge variant="secondary">完成 {queue.counts.done}</Badge>
           <Badge variant="destructive">失败 {queue.counts.error}</Badge>
+          <Badge
+            variant="outline"
+            data-testid="worker-pool-badge"
+            title="Worker 池存活数（浏览器无法测 worker 内存，故只显数量）"
+          >
+            Worker {queue.pool.busy}/{queue.pool.total}
+          </Badge>
         </div>
         <div className="ml-auto flex items-center gap-2">
           <div className="flex items-center gap-1">
@@ -109,7 +120,7 @@ export function QueuePanel({ queue }: { queue: QueueApi }) {
               value={String(queue.concurrency)}
               onValueChange={(v) => queue.setConcurrency(Number(v))}
             >
-              <SelectTrigger className="h-8 w-16">
+              <SelectTrigger className="h-8 w-16" aria-label="并发数">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -144,6 +155,17 @@ export function QueuePanel({ queue }: { queue: QueueApi }) {
             onClick={() => queue.clearAll()}
           >
             <Eraser className="mr-1 h-4 w-4" /> 清空
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={queue.pool.idle === 0 && !queue.pool.sherpa}
+            onClick={() => {
+              const n = queue.releaseMemory()
+              toast(n > 0 ? `已释放 ${n} 个空闲 worker` : '没有可释放的空闲 worker')
+            }}
+          >
+            <Zap className="mr-1 h-4 w-4" /> 释放内存
           </Button>
         </div>
       </div>

@@ -195,6 +195,7 @@ Whisper 非流式，做不到无限连续输出。准实时方案：
 | 8.10 | 推理异常可重试 | E2E | `error-retry.spec.ts` |
 | 8.11 | 说话人区分开关（默认关，开则标注） | 单元 | `diarization.test.ts` |
 | 8.12 | 双部署 CI 通过（CF Pages + GH Pages） | CI | `.github/workflows/deploy.yml` |
+| 8.13 | worker 内存回收（池状态可见 + 手动释放 + 闲置回收） | E2E | `integration-tests/worker-memory.spec.ts` |
 
 ### 8.2 审查/测试轮次记录
 
@@ -297,14 +298,26 @@ Whisper 非流式，做不到无限连续输出。准实时方案：
 `id / name / blob(可清理) / model / opts / status(pending|running|done|error) / progress / result / error / addedAt / startedAt / finishedAt / durationMs`
 
 ### 调度（`lib/use-queue.ts`）
-- concurrency 个常驻 Worker（默认 1，设置 1–3），从 `pending` 按序取任务；实际并发不超设置。
+- **弹性 Worker 池**：按 `min(并发, 待处理任务数)` 建够 Worker（默认 1，设置 1–3），从 `pending` 按序取任务；实际并发不超设置。详见「Worker 内存回收」。
 - **暂停**：`paused` 时不取新任务，当前 `running` 跑完；暂停按钮仅 `hasActive`（有 pending/running）时可用。
 - 解码 + 重采样在**主线程**（Web Audio 仅主线程可用），PCM 传 Worker 推理。
 - 进度更新只走 state；状态变更（添加/完成/失败/清理/重试）才写 IndexedDB（避免大 blob 频繁回写）。
 - 重启时 `running` 回退 `pending`，续跑。
 
+### Worker 内存回收（`lib/use-queue.ts`）
+**为什么**：transformers.js 每次 transcribe 新建 ORT InferenceSession，wasm 线性内存单调只增不减，`engine.dispose()` 只释放 session 引用、收不回 `WebAssembly.Memory`。Worker 常驻即内存常驻（跨任务只升不降），**唯一能回收 worker 内存的是 `terminate()` 整个 worker**。浏览器无标准 API 测 worker 的 wasm heap（`performance.memory` 只测 V8 JS 堆、不含 wasm；`measureUserAgentSpecificMemory` 需 COOP/COEP，项目已因 HF 资源冲突放弃），故池状态**只显存活数、不显字节**。
+
+**三个能力**：
+- **手动「释放内存」**：terminate 所有 idle whisper Worker + 非忙 sherpa Worker；busy（`workerTaskRef` 有映射）保留、不中断任务。释放后 `schedule()` 在未暂停时弹性补池重分配 pending。
+- **闲置 60s 自动 terminate**：Worker 变 idle（任务完成 / decode 失败归还）时 `armIdleTimer`；被分配新任务时 `clearIdleTimer`。到期回调二次校验（仍在池且仍 idle）才 terminate。dev 可用 `?idleTimeout=N`（秒）下调超时便于测试。
+- **池状态可见**：`pool = { total, busy, idle, sherpa }`，工具栏 Badge 显示 `Worker {busy}/{total}`。
+
+**弹性补池**：自动回收缩池后池 < 并发，由 `schedule()` 开头按 `min(并发, pending)` 补建；任务分配**每轮一个**（去重靠 `workerTaskRef` 即时 set + `tasksRef` 在 setTasks updater 内更新），禁止循环化（否则同任务双发到两 worker）。
+
+**sherpa**：`releaseMemory` 顺带 terminate 非忙 sherpa；自动闲置计时器暂未接（sherpa 当前为 dead code，复活时补）。
+
 ### UI（`features/queue/QueuePanel.tsx`）
-工具栏（计数 Badge + concurrency 设置 + 暂停/恢复 + 清空）+ 任务列表（模型/状态/进度条/各时间戳 + 查看结果/重试/清理音频/删除）。结果从任务点开 Dialog 查看（复用 ResultPanel）。
+工具栏（计数 Badge + Worker 池 Badge `Worker {busy}/{total}` + concurrency 设置 + 暂停/恢复 + 清空 + 释放内存）+ 任务列表（模型/状态/进度条/各时间戳 + 查看结果/重试/清理音频/删除）。结果从任务点开 Dialog 查看（复用 ResultPanel）。
 
 ### 每任务独立模型
 添加任务时用左侧"任务设置"（模型/语言/逐词/说话人），任务记住当时的设置。
@@ -315,6 +328,8 @@ Whisper 非流式，做不到无限连续输出。准实时方案：
 - 刷新/重启：任务与字幕保留，running 回退 pending
 - 清理音频：blob 置空、字幕保留；进度条识别中实时更新
 - medium(1.5GB) 在管理/引导/选择器三处体积警告
+- 释放内存：terminate idle worker（busy 不受影响），Badge 存活数下降；释放后再次添加任务可正常识别（弹性补池）—— `worker-memory.spec.ts`
+- 闲置 60s 自动回收（`?idleTimeout=` dev 钩子或手动空等验证）
 
 ---
 
